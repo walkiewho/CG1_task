@@ -3,10 +3,10 @@ import tkinter as tk
 from dataclasses import dataclass
 from typing import override
 
-WIN_WIDTH = 500
-WIN_HEIGHT = 500
+WIN_WIDTH = 900
+WIN_HEIGHT = 900
 GROUND_LEVEL_Y = WIN_HEIGHT * 2 // 3
-CAR_SIZE = 80
+CAR_SIZE = 150
 
 
 @dataclass
@@ -50,9 +50,11 @@ class MoveableObject:
     def __init__(self, center=Point(WIN_WIDTH // 2, WIN_HEIGHT // 2)):
         self.center: Point = center
         self._moveable_parts = []
+        self.is_moving = False
 
 
     def animate(self, d_x: int, d_y: int, v_x: int, v_y: int, delay: int = 50):
+        self.is_moving = True
         """
         Анимация плавного перемещения объекта.
 
@@ -88,6 +90,8 @@ class MoveableObject:
             # 5. Если цель еще не достигнута, планируем следующий кадр анимации
             if self.center.x != target_x or self.center.y != target_y:
                 canvas.after(delay, step)
+            else:
+                self.is_moving = False
 
         # Запускаем первый шаг анимации
         step()
@@ -103,6 +107,7 @@ class Car(MoveableObject):
         self.size = size // 2
         self.car_index = Car.cars_count
         Car.cars_count += 1
+        self._window = None
         self.draw()
 
 
@@ -122,13 +127,14 @@ class Car(MoveableObject):
                                             self.center.y - self.size // 2,
                                             outline=self._color.to_hex(), fill=self._color.to_hex()
         ))
-        self._moveable_parts.append(canvas.create_rectangle(
+        self._window = canvas.create_rectangle(
                                             self.center.x + self.size // 5,
                                             self.center.y - self.size * 1.2,
                                             self.center.x + self.size // 1.5,
                                             self.center.y - self.size // 2,
                                             outline=self._color.to_hex(), fill='lightblue'
-        ))
+        )
+        self._moveable_parts.append(self._window)
         self._moveable_parts.append(canvas.create_oval(
                                             self.center.x + self.size * 3 // 8,
                                             self.center.y + self.size * 1 // 4,
@@ -144,15 +150,34 @@ class Car(MoveableObject):
                                             outline='black', fill='gray', width=5
         ))
 
+
         def ride_car(event):
+            if self.is_moving:
+                return
             if event.x > self.center.x:
+                self.move_window_forward()
                 if self.center.x < WIN_WIDTH:
                     self.animate(50, 0, 5, 0)
             else:
+                self.move_window_backward()
                 if self.center.x > 0:
                     self.animate(-50, 0, -5, 0)
 
         canvas.tag_bind(f'Body-{self.car_index}', "<Button-1>", ride_car)
+
+    def move_window_forward(self):
+        canvas.coords(self._window,
+                      self.center.x + self.size // 5,
+                      self.center.y - self.size * 1.2,
+                      self.center.x + self.size // 1.5,
+                      self.center.y - self.size // 2)
+
+    def move_window_backward(self):
+        canvas.coords(self._window,
+                      self.center.x - self.size // 5,
+                      self.center.y - self.size * 1.2,
+                      self.center.x - self.size // 1.5,
+                      self.center.y - self.size // 2)
 
 
 if __name__ == "__main__":
@@ -170,8 +195,8 @@ if __name__ == "__main__":
 
 
     # first car to move
-    test_car = Car(center=Point(50, ROAD_LEVEL_CENTER), size=CAR_SIZE, color=Color(255, 80, 60))
-    test_car2 = Car(center=Point(WIN_WIDTH - 50, ROAD_LEVEL_CENTER), size=CAR_SIZE // 2, color=Color(0, 0, 255))
+    test_car = Car(center=Point(CAR_SIZE, ROAD_LEVEL_CENTER), size=CAR_SIZE, color=Color(255, 80, 60))
+    test_car2 = Car(center=Point(WIN_WIDTH - CAR_SIZE, ROAD_LEVEL_CENTER), size=CAR_SIZE // 2, color=Color(0, 0, 255))
     #test_car.animate(WIN_WIDTH, 0, 10, 0, delay=50)
 
     root.mainloop()
