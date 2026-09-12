@@ -1,14 +1,13 @@
 
 import tkinter as tk
 from dataclasses import dataclass
+from typing import override
 
+WIN_WIDTH = 500
+WIN_HEIGHT = 500
+GROUND_LEVEL_Y = WIN_HEIGHT * 2 // 3
+CAR_SIZE = 80
 
-root = tk.Tk()
-
-WIN_WIDTH = 1500
-WIN_HEIGHT = 1500
-canvas = tk.Canvas(root, width=WIN_WIDTH, height=WIN_HEIGHT, bg="white")
-canvas.pack()
 
 @dataclass
 class Point:
@@ -46,84 +45,129 @@ class Color:
     def to_hex(self):
         return f"#{self.r:02x}{self.g:02x}{self.b:02x}"
 
+
 class MoveableObject:
     def __init__(self, center=Point(WIN_WIDTH // 2, WIN_HEIGHT // 2)):
         self.center: Point = center
-        self.__moveable_parts: list = []
-        self.vx = 5
-        self.vy = 0
+        self._moveable_parts = []
 
 
+    def animate(self, d_x: int, d_y: int, v_x: int, v_y: int, delay: int = 50):
+        """
+        Анимация плавного перемещения объекта.
 
+        :param d_x: Целевая координата X (Destination X)
+        :param d_y: Целевая координата Y (Destination Y)
+        :param v_x: Скорость перемещения по X (пикселей за кадр)
+        :param v_y: Скорость перемещения по Y (пикселей за кадр)
+        :param delay: Задержка между кадрами в миллисекундах (по умолчанию 50 мс)
+        """
+        # Примечание: Если по задумке d_x и d_y — это смещение (дельта),
+        # а не абсолютные координаты цели, замените эти две строки на:
+        target_x = self.center.x + d_x
+        target_y = self.center.y + d_y
 
+        def step():
+            # 1. Определяем направление движения к цели (-1, 0 или 1)
+            dir_x = 1 if target_x > self.center.x else -1 if target_x < self.center.x else 0
+            dir_y = 1 if target_y > self.center.y else -1 if target_y < self.center.y else 0
+
+            # 2. Вычисляем шаг так, чтобы на последнем кадре не перескочить целевую точку
+            step_x = dir_x * min(abs(target_x - self.center.x), abs(v_x))
+            step_y = dir_y * min(abs(target_y - self.center.y), abs(v_y))
+
+            # 3. Обновляем логические координаты центра
+            # (Point.__setattr__ автоматически ограничит их пределами окна 0..WIN_WIDTH/HEIGHT)
+            self.center.x += step_x
+            self.center.y += step_y
+
+            # 4. Сдвигаем все графические примитивы объекта на холсте
+            for part in self._moveable_parts:
+                canvas.move(part, step_x, step_y)
+
+            # 5. Если цель еще не достигнута, планируем следующий кадр анимации
+            if self.center.x != target_x or self.center.y != target_y:
+                canvas.after(delay, step)
+
+        # Запускаем первый шаг анимации
+        step()
 
 
 class Car(MoveableObject):
-    def __init__(self, center=Point(WIN_WIDTH // 2, WIN_HEIGHT // 2), size=200, color=Color(255, 0, 0)):
+    def __init__(self, center=Point(WIN_WIDTH // 2, WIN_HEIGHT // 2), size=100, color=Color(255, 0, 0)):
         super().__init__(center)
 
         self._color = color
         self.size = size // 2
         self.draw()
 
-        # Parts
-        self.__moveable_parts = [self._body, self._top, self._window, self._backward_wheel, self._forward_wheel]
-        self._body = None
-        self._top = None
-        self._window = None
-        self._backward_wheel = None
-        self._forward_wheel = None
 
     def draw(self):
-        self._body = canvas.create_rectangle(
+        self._moveable_parts.append(canvas.create_rectangle(
                                             self.center.x - self.size,
                                             self.center.y - self.size // 2,
                                             self.center.x + self.size,
                                             self.center.y + self.size // 2,
-                                            outline=self._color.to_hex(), fill=self._color.to_hex()
-        )
-        self._top = canvas.create_rectangle(
+                                            outline=self._color.to_hex(), fill=self._color.to_hex(),
+                                            tags='BODY_CAR'
+        ))
+        self._moveable_parts.append(canvas.create_rectangle(
                                             self.center.x - self.size // 1.5,
                                             self.center.y - self.size * 1.2,
                                             self.center.x + self.size // 1.5,
                                             self.center.y - self.size // 2,
                                             outline=self._color.to_hex(), fill=self._color.to_hex()
-        )
-        self._window = canvas.create_rectangle(
+        ))
+        self._moveable_parts.append(canvas.create_rectangle(
                                             self.center.x + self.size // 5,
                                             self.center.y - self.size * 1.2,
                                             self.center.x + self.size // 1.5,
                                             self.center.y - self.size // 2,
                                             outline=self._color.to_hex(), fill='lightblue'
-        )
-        self._forward_wheel = canvas.create_oval(
+        ))
+        self._moveable_parts.append(canvas.create_oval(
                                             self.center.x + self.size * 3 // 8,
                                             self.center.y + self.size * 1 // 4,
                                             self.center.x + self.size * 7 // 8,
                                             self.center.y + self.size * 3 // 4,
                                             outline='black', fill='gray', width=5
-        )
-        self._backward_wheel = canvas.create_oval(
+        ))
+        self._moveable_parts.append(canvas.create_oval(
                                             self.center.x - self.size * 3 // 8,
                                             self.center.y + self.size * 1 // 4,
                                             self.center.x - self.size * 7 // 8,
                                             self.center.y + self.size * 3 // 4,
                                             outline='black', fill='gray', width=5
-        )
+        ))
 
-    def animate(self):
-        self.center += Point(self.vx, self.vy)
-        if self.center.x < 1500:
-            for part in self.__moveable_parts:
-                canvas.move(part, self.vx, self.vy)
-            root.after(50, self.animate)
+        def ride_car(event):
+            if event.x > self.center.x:
+                if self.center.x < WIN_WIDTH:
+                    self.animate(50, 0, 5, 0)
+            else:
+                if self.center.x > 0:
+                    self.animate(-50, 0, -5, 0)
+
+        canvas.tag_bind("BODY_CAR", "<Button-1>", ride_car)
+
+if __name__ == "__main__":
+    # Tkinter
+    root = tk.Tk()
+    canvas = tk.Canvas(root, width=WIN_WIDTH, height=WIN_HEIGHT, bg="lightblue")
+    canvas.pack()
+    test = canvas.create_rectangle(0, GROUND_LEVEL_Y, WIN_WIDTH + 1, WIN_HEIGHT + 1, fill="lightgreen", outline='green', width=5)
+    GROUND_HEIGHT = WIN_HEIGHT - GROUND_LEVEL_Y
+    ROAD_LEVEL_CENTER = GROUND_LEVEL_Y + (WIN_HEIGHT - GROUND_LEVEL_Y) // 2
+
+    print(GROUND_LEVEL_Y + WIN_HEIGHT // 6)
+    print(WIN_HEIGHT - WIN_HEIGHT // 6, WIN_HEIGHT // 6)
+    canvas.create_rectangle(0, GROUND_LEVEL_Y + (WIN_HEIGHT - GROUND_LEVEL_Y) // 4, WIN_WIDTH + 1, WIN_HEIGHT - (WIN_HEIGHT - GROUND_LEVEL_Y) // 4, fill="gray", outline='black', width=5)
+    canvas.create_line(0, ROAD_LEVEL_CENTER, WIN_WIDTH + 1, ROAD_LEVEL_CENTER, dash=(10, 10), width=3, fill='yellow')
+    canvas.create_oval(200, 50, 300, 150, outline="yellow", fill="yellow")
 
 
-GROUND_LEVEL_Y = WIN_HEIGHT * 2 // 3
-canvas.create_rectangle(0, GROUND_LEVEL_Y, WIN_WIDTH + 1, WIN_HEIGHT + 1, fill="lightgreen", outline='green')
-canvas.create_oval(200, 50, 300, 150, outline="yellow", fill="yellow")
-print(Color(255, 0, 0).to_hex())
-test_car = Car()
-test_car.animate()
-print(1)
-root.mainloop()
+    # first car to move
+    test_car = Car(center=Point(50, ROAD_LEVEL_CENTER), size=CAR_SIZE, color=Color(255, 80, 60))
+    #test_car.animate(WIN_WIDTH, 0, 10, 0, delay=50)
+
+    root.mainloop()
