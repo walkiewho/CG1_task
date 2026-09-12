@@ -94,11 +94,15 @@ class MoveableObject:
 
 
 class Car(MoveableObject):
+    cars_count = 0
+
     def __init__(self, center=Point(WIN_WIDTH // 2, WIN_HEIGHT // 2), size=100, color=Color(255, 0, 0)):
         super().__init__(center)
 
         self._color = color
         self.size = size // 2
+        self.car_index = Car.cars_count
+        Car.cars_count += 1
         self.draw()
 
 
@@ -109,7 +113,7 @@ class Car(MoveableObject):
                                             self.center.x + self.size,
                                             self.center.y + self.size // 2,
                                             outline=self._color.to_hex(), fill=self._color.to_hex(),
-                                            tags='BODY_CAR'
+                                            tags=f'Body-{self.car_index}'
         ))
         self._moveable_parts.append(canvas.create_rectangle(
                                             self.center.x - self.size // 1.5,
@@ -148,7 +152,8 @@ class Car(MoveableObject):
                 if self.center.x > 0:
                     self.animate(-50, 0, -5, 0)
 
-        canvas.tag_bind("BODY_CAR", "<Button-1>", ride_car)
+        canvas.tag_bind(f'Body-{self.car_index}', "<Button-1>", ride_car)
+
 
 if __name__ == "__main__":
     # Tkinter
@@ -159,8 +164,6 @@ if __name__ == "__main__":
     GROUND_HEIGHT = WIN_HEIGHT - GROUND_LEVEL_Y
     ROAD_LEVEL_CENTER = GROUND_LEVEL_Y + (WIN_HEIGHT - GROUND_LEVEL_Y) // 2
 
-    print(GROUND_LEVEL_Y + WIN_HEIGHT // 6)
-    print(WIN_HEIGHT - WIN_HEIGHT // 6, WIN_HEIGHT // 6)
     canvas.create_rectangle(0, GROUND_LEVEL_Y + (WIN_HEIGHT - GROUND_LEVEL_Y) // 4, WIN_WIDTH + 1, WIN_HEIGHT - (WIN_HEIGHT - GROUND_LEVEL_Y) // 4, fill="gray", outline='black', width=5)
     canvas.create_line(0, ROAD_LEVEL_CENTER, WIN_WIDTH + 1, ROAD_LEVEL_CENTER, dash=(10, 10), width=3, fill='yellow')
     canvas.create_oval(200, 50, 300, 150, outline="yellow", fill="yellow")
@@ -168,6 +171,7 @@ if __name__ == "__main__":
 
     # first car to move
     test_car = Car(center=Point(50, ROAD_LEVEL_CENTER), size=CAR_SIZE, color=Color(255, 80, 60))
+    test_car2 = Car(center=Point(WIN_WIDTH - 50, ROAD_LEVEL_CENTER), size=CAR_SIZE // 2, color=Color(0, 0, 255))
     #test_car.animate(WIN_WIDTH, 0, 10, 0, delay=50)
 
     root.mainloop()
