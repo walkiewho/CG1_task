@@ -228,13 +228,12 @@ class Rocket(MoveableObject):
         def flight(event):
             if self.is_moving:
                 return
-
-            # если ракета уже падала — остановим старый цикл падения
-            self._falling = False
-            self._vy = 0
-
-            # после подъёма начнётся падение
-            self.move(0, -50, 0, 5, on_complete=self.start_fall)
+            if event.y > self.center.y:
+                if self.center.y < WIN_HEIGHT:
+                    self.move(0, 50, 0, 5)
+            else:
+                if self.center.y > 0:
+                    self.move(0, -50, 0, -10)
 
         canvas.tag_bind(f'Rocket-{self.__rocket_index}', "<Button-1>", flight)
 
