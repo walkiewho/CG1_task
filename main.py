@@ -237,42 +237,6 @@ class Rocket(MoveableObject):
 
         canvas.tag_bind(f'Rocket-{self.__rocket_index}', "<Button-1>", flight)
 
-    def start_fall(self):
-        if self.is_moving or self._falling:
-            return
-        self._falling = True
-        self._fall_step()
-
-    def _fall_step(self):
-        if not self._falling:
-            return
-
-        if self.is_moving:
-            canvas.after(self._fall_delay, self._fall_step)
-            return
-
-        self._vy += self._gravity
-        dy = self._vy
-
-        floor_y = GROUND_LEVEL_Y - self._size
-
-        if self.center.y + dy >= floor_y:
-            dy = floor_y - self.center.y
-            self.center.y = floor_y
-
-            for part in self._moveable_parts:
-                canvas.move(part, 0, dy)
-
-            self._vy = 0
-            self._falling = False
-            return
-
-        self.center.y += dy
-        for part in self._moveable_parts:
-            canvas.move(part, 0, dy)
-
-        canvas.after(self._fall_delay, self._fall_step)
-
     def change_color(self, delay):
 
         def inner_timer():
