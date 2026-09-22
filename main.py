@@ -1,5 +1,6 @@
 import tkinter as tk
 from dataclasses import dataclass
+import random
 
 WIN_WIDTH = 900
 WIN_HEIGHT = 900
@@ -38,7 +39,7 @@ class Color:
     b: int
 
     def __setattr__(self, attr, value):
-        if attr in ("r", "g", "b", "a"):
+        if attr in ("r", "g", "b"):
             if not 0 <= value <= 255:
                 raise ValueError(f"{attr} должен быть 0-255")
         super().__setattr__(attr, value)
@@ -53,7 +54,7 @@ class MoveableObject:
         self._moveable_parts = []
         self.is_moving = False
 
-    def move(self, d_x: int, d_y: int, v_x: int, v_y: int, delay: int = 50):
+    def move(self, d_x: int, d_y: int, v_x: int, v_y: int, delay: int = 50, on_complete=None):
         self.is_moving = True
         target_x = self.center.x + d_x
         target_y = self.center.y + d_y
@@ -75,6 +76,8 @@ class MoveableObject:
                 canvas.after(delay, step)
             else:
                 self.is_moving = False
+                if on_complete:
+                    on_complete()
 
         step()
 
@@ -87,7 +90,7 @@ class Car(MoveableObject):
 
         self._color = color
         self._size = size
-        self.car_index = Car.cars_count
+        self.__car_index = Car.cars_count
         Car.cars_count += 1
         self._window = None
         self.draw()
@@ -99,7 +102,7 @@ class Car(MoveableObject):
             self.center.x + self._size,
             self.center.y + self._size // 2,
             outline=self._color.to_hex(), fill=self._color.to_hex(),
-            tags=f'Body-{self.car_index}'
+            tags=f'Car-{self.__car_index}'
         ))
         self._moveable_parts.append(canvas.create_rectangle(
             self.center.x - self._size // 1.5,
@@ -143,7 +146,7 @@ class Car(MoveableObject):
                 if self.center.x > 0:
                     self.move(-50, 0, -5, 0)
 
-        canvas.tag_bind(f'Body-{self.car_index}', "<Button-1>", ride_car)
+        canvas.tag_bind(f'Car-{self.__car_index}', "<Button-1>", ride_car)
 
     def move_window_forward(self):
         canvas.coords(self._window,
@@ -158,6 +161,133 @@ class Car(MoveableObject):
                       self.center.y - self._size * 1.2,
                       self.center.x - self._size // 1.5,
                       self.center.y - self._size // 2)
+
+
+class Rocket(MoveableObject):
+    rocket_count = 0
+
+    def __init__(self, center=Point(WIN_WIDTH // 2, WIN_HEIGHT // 2), size=100, color=Color(255, 0, 0), long_nose=False, epileptic=False):
+        super().__init__(center)
+        self._start_height = center.y
+        self._height = None
+        self._size = size
+        self._color = color
+        self.__rocket_index = Rocket.rocket_count
+        Rocket.rocket_count += 1
+        self.__long_nose = long_nose
+        self._body = None
+        self.draw()
+        self.is_flight = False
+        self._falling = False
+        self._vy = 0
+        self._gravity = 1
+        self._fall_delay = 30
+        if epileptic:
+            self.change_color(1000)
+
+    def draw(self):
+        self._body = canvas.create_rectangle(
+            self.center.x - self._size // 4,
+            self.center.y - self._size,
+            self.center.x + self._size // 4,
+            self.center.y + self._size,
+            outline='black', fill=self._color.to_hex(),
+            tags=f'Rocket-{self.__rocket_index}'
+        )
+        self._moveable_parts.append(self._body)
+        self._moveable_parts.append(canvas.create_polygon(
+            self.center.x - self._size // 4,
+            self.center.y + self._size,
+            self.center.x - self._size // 4,
+            self.center.y + self._size // 2,
+            self.center.x - self._size // 4 - self._size // 2,
+            self.center.y + self._size,
+            outline='black', fill='gray'
+        ))
+
+        self._moveable_parts.append(canvas.create_polygon(
+            self.center.x + self._size // 4,
+            self.center.y + self._size,
+            self.center.x + self._size // 4,
+            self.center.y + self._size // 2,
+            self.center.x + self._size // 4 + self._size // 2,
+            self.center.y + self._size,
+            outline='black', fill='gray'
+        ))
+
+        self._moveable_parts.append(canvas.create_polygon(
+            self.center.x - self._size // 4,
+            self.center.y - self._size,
+            self.center.x + self._size // 4,
+            self.center.y - self._size,
+            self.center.x,
+            self.center.y - self._size - int(3 ** 0.5 * self._size / (0.07 if self.__long_nose else 3)),
+            outline='black', fill='gray'
+        ))
+
+        def flight(event):
+            if self.is_moving:
+                return
+
+            # если ракета уже падала — остановим старый цикл падения
+            self._falling = False
+            self._vy = 0
+
+            # после подъёма начнётся падение
+            self.move(0, -50, 0, 5, on_complete=self.start_fall)
+
+        canvas.tag_bind(f'Rocket-{self.__rocket_index}', "<Button-1>", flight)
+
+    def start_fall(self):
+        if self.is_moving or self._falling:
+            return
+        self._falling = True
+        self._fall_step()
+
+    def _fall_step(self):
+        if not self._falling:
+            return
+
+        if self.is_moving:
+            canvas.after(self._fall_delay, self._fall_step)
+            return
+
+        self._vy += self._gravity
+        dy = self._vy
+
+        floor_y = GROUND_LEVEL_Y - self._size
+
+        if self.center.y + dy >= floor_y:
+            dy = floor_y - self.center.y
+            self.center.y = floor_y
+
+            for part in self._moveable_parts:
+                canvas.move(part, 0, dy)
+
+            self._vy = 0
+            self._falling = False
+            return
+
+        self.center.y += dy
+        for part in self._moveable_parts:
+            canvas.move(part, 0, dy)
+
+        canvas.after(self._fall_delay, self._fall_step)
+
+    def change_color(self, delay):
+
+        def inner_timer():
+            new_color = Color(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+
+            canvas.itemconfig(self._body, fill=new_color.to_hex())
+
+            canvas.after(delay + 271 * self.__rocket_index, inner_timer)
+        inner_timer()
+
+    @property
+    def height(self):
+        return self.center.y - self._size
+
 
 
 
@@ -185,6 +315,11 @@ def main():
 
     # second car
     Car(center=Point(WIN_WIDTH - CAR_SIZE, ROAD_LEVEL_CENTER), size=CAR_SIZE // 2, color=Color(0, 0, 255))
+
+    # first rocket
+    Rocket(center=Point(WIN_WIDTH // 3 * 2, GROUND_LEVEL_Y - CAR_SIZE), size=CAR_SIZE)
+
+    Rocket(center=Point(WIN_WIDTH // 3, GROUND_LEVEL_Y - CAR_SIZE // 2), size=CAR_SIZE // 2, color=Color(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)), long_nose=False, epileptic=True)
 
     root.mainloop()
 
